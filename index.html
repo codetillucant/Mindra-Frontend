@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Mindra — Learn & Build</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <div class="brand">Mindra</div>
+      <nav class="main-nav" aria-label="Main">
+        <button id="nav-home" class="nav-btn">Home</button>
+        <button id="nav-courses" class="nav-btn">Courses</button>
+        <button id="nav-progress" class="nav-btn">My Progress</button>
+      </nav>
+      <div class="actions">
+        <button id="btn-admin" class="btn-link">Content</button>
+        <button id="btn-login" class="btn-primary">Log in</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="app" class="container">
+    <!-- Hero / Landing -->
+    <section id="home" class="page page-active">
+      <div class="hero">
+        <h1>Learn. Practice. Build.</h1>
+        <p>Self‑paced interactive modules, bite‑sized quizzes, and practical projects to build real skills.</p>
+        <div class="hero-actions">
+          <button id="start-now" class="btn-primary">Browse Courses</button>
+          <a href="#" class="muted">See curriculum</a>
+        </div>
+      </div>
+
+      <section class="featured-courses">
+        <h2>Featured courses</h2>
+        <div id="courses-grid" class="grid"></div>
+      </section>
+    </section>
+
+    <!-- Courses list -->
+    <section id="courses" class="page" aria-hidden="true">
+      <h2>All Courses</h2>
+      <div id="courses-list" class="grid"></div>
+    </section>
+
+    <!-- Course / Module view -->
+    <section id="course-view" class="page" aria-hidden="true">
+      <button id="back-to-courses" class="btn-link">&larr; Back</button>
+      <div id="course-content"></div>
+    </section>
+
+    <!-- Progress -->
+    <section id="progress" class="page" aria-hidden="true">
+      <h2>My Progress</h2>
+      <div id="progress-list"></div>
+    </section>
+  </main>
+
+  <!-- Login / Register Modal -->
+  <div id="modal-auth" class="modal" aria-hidden="true">
+    <div class="modal-inner">
+      <button class="modal-close" id="close-auth">&times;</button>
+      <h3 id="auth-title">Log in</h3>
+      <form id="auth-form">
+        <label>
+          Email
+          <input id="auth-email" type="email" required>
+        </label>
+        <label>
+          Password
+          <input id="auth-password" type="password" required minlength="6">
+        </label>
+        <div class="form-actions">
+          <button type="submit" class="btn-primary">Submit</button>
+          <button type="button" id="switch-auth" class="btn-link">Create account</button>
+        </div>
+        <div id="auth-message" class="muted small"></div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Quiz Modal -->
+  <div id="modal-quiz" class="modal" aria-hidden="true">
+    <div class="modal-inner">
+      <button class="modal-close" id="close-quiz">&times;</button>
+      <div id="quiz-root"></div>
+    </div>
+  </div>
+
+  <!-- Admin Content Editor Modal -->
+  <div id="modal-editor" class="modal" aria-hidden="true">
+    <div class="modal-inner">
+      <button class="modal-close" id="close-editor">&times;</button>
+      <h3>Content Editor</h3>
+      <form id="editor-form">
+        <label>Course title<input id="editor-title" required></label>
+        <label>Summary<textarea id="editor-summary" rows="3"></textarea></label>
+        <label>Level
+          <select id="editor-level">
+            <option>Beginner</option>
+            <option>Intermediate</option>
+            <option>Advanced</option>
+          </select>
+        </label>
+        <label>Modules (JSON)
+          <textarea id="editor-modules" rows="8" placeholder='[{"title":"Intro","content":"...","quiz":[...]}]'></textarea>
+        </label>
+        <div class="form-actions">
+          <button type="submit" class="btn-primary">Save Course</button>
+        </div>
+        <div id="editor-msg" class="muted small"></div>
+      </form>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>&copy; 2025 Mindra — learn that sticks.</p>
+    </div>
+  </footer>
+
+  <script src="app.js" defer></script>
+</body>
+</html>
