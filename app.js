@@ -1,116 +1,79 @@
-// Minimal Mindra front-end app
-// - Contains sample course data (courses)
-// - Client-side mock auth using localStorage (mindra_user)
-// - Progress tracking in localStorage (mindra_progress)
-// - Render logic for course list, course view, quizzes
-// - Simple content editor for prototyping (admin modal)
+// Minimal Mindra front-end app with form-based module editor and admin flow
+// - Courses persist to localStorage ('mindra_courses')
+// - Admin sign-in toggles admin mode stored in localStorage 'mindra_is_admin' (demo-only)
+// - Editor provides add/remove module UI and simple quiz inputs
+
+const ADMIN_PASSWORD = 'mindra123'; // demo password: change before production
 
 const state = {
   user: null,
-  courses: [], // populated below
+  isAdmin: false,
+  courses: [],
   currentCourse: null,
   currentModuleIndex: 0,
 };
 
-// --- Sample data (replace with fetch from API) ---
-state.courses = [
+// --- Default sample data ---
+const DEFAULT_COURSES = [
   {
     id: "course-html-basics",
     title: "HTML & Semantic Markup",
     summary: "Learn the basics of HTML markup and build accessible pages.",
     level: "Beginner",
     modules: [
-      {
-        id: "html-intro",
-        title: "Introduction to HTML",
-        content: `<p>HTML (HyperText Markup Language) is the foundation of web pages. Learn tags like &lt;h1&gt;, &lt;p&gt;, &lt;a&gt;, and semantic elements.</p>`,
-        media: { images: [], video: "" },
-        quiz: [
-          {
-            q: "Which tag defines a paragraph?",
-            options: ["<p>", "<div>", "<span>", "<section>"],
-            answerIndex: 0,
-          },
-        ],
-      },
-      {
-        id: "html-forms",
-        title: "Forms & Inputs",
-        content: `<p>Forms collect user input. We'll cover inputs, labels, and accessibility basics.</p>`,
-        quiz: [
-          {
-            q: "Which attribute links a label to an input?",
-            options: ["for", "id", "name", "type"],
-            answerIndex: 0,
-          },
-        ],
-      },
-    ],
-  },
-  {
-    id: "course-js-practical",
-    title: "Practical JavaScript",
-    summary: "Small practical exercises to learn DOM, events, and state.",
-    level: "Intermediate",
-    modules: [
-      {
-        id: "js-dom",
-        title: "DOM Manipulation",
-        content: `<p>Interact with the page using the Document Object Model (DOM).</p>`,
-        quiz: [
-          {
-            q: "Which method selects an element by CSS selector?",
-            options: ["getElementById()", "querySelector()", "getElementsByClassName()", "createElement()"],
-            answerIndex: 1,
-          },
-        ],
-      },
+      { id: "html-intro", title: "Introduction to HTML", content: `<p>HTML (HyperText Markup Language) is the foundation of web pages.</p>`, quiz: [] },
+      { id: "html-forms", title: "Forms & Inputs", content: `<p>Forms collect user input.</p>`, quiz: [] },
     ],
   },
 ];
 
+// --- Storage helpers ---
+function loadCourses() {
+  const raw = localStorage.getItem("mindra_courses");
+  if (!raw) { state.courses = DEFAULT_COURSES.slice(); saveCourses(); return; }
+  try { const parsed = JSON.parse(raw); state.courses = Array.isArray(parsed) ? parsed : DEFAULT_COURSES.slice(); } catch (e) { state.courses = DEFAULT_COURSES.slice(); saveCourses(); }
+}
+function saveCourses() { localStorage.setItem("mindra_courses", JSON.stringify(state.courses)); }
+
+// --- Admin helpers ---
+function loadAdmin() {
+  state.isAdmin = !!localStorage.getItem('mindra_is_admin');
+}
+function setAdmin(value) {
+  state.isAdmin = !!value;
+  if (value) localStorage.setItem('mindra_is_admin', '1'); else localStorage.removeItem('mindra_is_admin');
+  renderAdminUI();
+}
+
 // --- Utilities ---
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+function slugify(s) { return String(s).toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''); }
+function escapeHTML(s){ return String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
-function saveUser(user) {
-  state.user = user;
-  if (user) localStorage.setItem("mindra_user", JSON.stringify(user));
-  else localStorage.removeItem("mindra_user");
-}
+function saveUser(user) { state.user = user; if (user) localStorage.setItem("mindra_user", JSON.stringify(user)); else localStorage.removeItem("mindra_user"); }
+function loadUser() { const raw = localStorage.getItem("mindra_user"); if (raw) { try { state.user = JSON.parse(raw); } catch(e){ state.user = null; } } }
 
-function loadUser() {
-  const raw = localStorage.getItem("mindra_user");
-  if (raw) {
-    try { state.user = JSON.parse(raw); } catch (e) { state.user = null; }
+// --- Rendering ---
+function renderAdminUI(){
+  const newBtn = $('#btn-new-course');
+  const adminBtn = $('#btn-admin');
+  if (!newBtn || !adminBtn) return;
+  if (state.isAdmin) {
+    newBtn.style.display = 'inline-block';
+    adminBtn.textContent = 'Content';
+  } else {
+    newBtn.style.display = 'none';
+    adminBtn.textContent = 'Admin';
   }
 }
 
-function getProgressStore() {
-  const raw = localStorage.getItem("mindra_progress") || "{}";
-  try { return JSON.parse(raw); } catch (e) { return {}; }
-}
-function saveProgressStore(store) {
-  localStorage.setItem("mindra_progress", JSON.stringify(store));
-}
-function getUserProgress() {
-  const store = getProgressStore();
-  return (state.user && store[state.user.email]) ? store[state.user.email] : {};
-}
-function setUserProgress(progress) {
-  if (!state.user) return;
-  const store = getProgressStore();
-  store[state.user.email] = progress;
-  saveProgressStore(store);
-}
-
-// --- Rendering ---
 function renderCoursesGrid(targetId, courses = state.courses) {
   const el = $(`#${targetId}`);
   el.innerHTML = "";
   courses.forEach(c => {
-    const card = document.createElement("article");
-    card.className = "course-card";
+    const card = document.createElement('article');
+    card.className = 'course-card';
     card.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div>
@@ -129,399 +92,110 @@ function renderCoursesGrid(targetId, courses = state.courses) {
     el.appendChild(card);
   });
 
-  // attach handlers
-  $$(".btn-open").forEach(b => b.addEventListener("click", (e) => {
-    const id = e.currentTarget.dataset.id;
-    openCourse(id);
-  }));
-  $$(".btn-edit").forEach(b => b.addEventListener("click", (e) => {
-    openEditorFor(e.currentTarget.dataset.id);
-  }));
+  $$('.btn-open').forEach(b => b.addEventListener('click', (e) => openCourse(e.currentTarget.dataset.id)));
+  $$('.btn-edit').forEach(b => b.addEventListener('click', (e) => openEditorFor(e.currentTarget.dataset.id)));
 }
 
-function escapeHTML(s){ return String(s).replace(/[&<>"]/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c])); }
-
-function openCourse(courseId) {
-  const course = state.courses.find(c => c.id === courseId);
-  if (!course) return;
-  state.currentCourse = course;
-  state.currentModuleIndex = 0;
-  navigateTo("course-view");
-  renderCourseView();
-  trackEvent("open_course", { courseId });
+function openCourse(courseId){ const course = state.courses.find(c=>c.id===courseId); if(!course) return; state.currentCourse = course; state.currentModuleIndex = 0; navigateTo('course-view'); renderCourseView(); }
+function renderCourseView(){ const wrapper = $('#course-content'); const c = state.currentCourse; if(!c){ wrapper.innerHTML = '<p>No course selected.</p>'; return; } const module = c.modules[state.currentModuleIndex]; wrapper.innerHTML = `
+  <h2>${escapeHTML(c.title)}</h2>
+  <div class="muted small">${escapeHTML(c.summary)} · ${escapeHTML(c.level)}</div>
+  <hr>
+  <h3>${escapeHTML(module.title)}</h3>
+  <div class="module-content">${module.content}</div>
+  <div style="margin-top:1rem;display:flex;gap:0.5rem">
+    <button id="btn-start-quiz" class="btn-primary">Start Quiz</button>
+    <div style="margin-left:auto" class="muted small">Module ${state.currentModuleIndex+1} / ${c.modules.length}</div>
+  </div>
+  <div style="margin-top:1rem" id="module-nav"></div>
+`;
+  $('#btn-start-quiz').addEventListener('click', ()=> startQuiz(module));
+  const nav = $('#module-nav'); c.modules.forEach((m, idx)=>{ const btn = document.createElement('button'); btn.className='btn-link'; btn.textContent = 
+`${idx+1}. ${m.title}`;
+    btn.addEventListener('click', ()=>{ state.currentModuleIndex = idx; renderCourseView(); }); nav.appendChild(btn);
+  });
 }
 
-function renderCourseView() {
-  const wrapper = $("#course-content");
-  const c = state.currentCourse;
-  if (!c) { wrapper.innerHTML = "<p>No course selected.</p>"; return; }
+// --- Quiz (unchanged simplified) ---
+function startQuiz(module){ const modal = $('#modal-quiz'); const root = $('#quiz-root'); modal.setAttribute('aria-hidden','false'); root.innerHTML = `<h3>Quiz</h3><p class="muted">No questions yet.</p><div style="margin-top:1rem"><button id="quiz-close" class="btn-primary">Close</button></div>`; $('#quiz-close').addEventListener('click', ()=> modal.setAttribute('aria-hidden','true')); }
 
-  const module = c.modules[state.currentModuleIndex];
-  const progress = getUserProgress();
-  const completed = (progress[c.id] && progress[c.id][module.id]) || false;
+// --- Navigation ---
+function navigateTo(pageId){ $$('.page').forEach(p=>p.classList.remove('page-active')); const p = $(`#${pageId}`); if(p) p.classList.add('page-active'); $$('.page').forEach(el=> el.setAttribute('aria-hidden', el!==p)); }
 
-  wrapper.innerHTML = `
-    <h2>${escapeHTML(c.title)}</h2>
-    <div class="muted small">${escapeHTML(c.summary)} · ${escapeHTML(c.level)}</div>
-    <hr>
-    <h3>${escapeHTML(module.title)} ${completed ? "✅" : ""}</h3>
-    <div class="module-content">${module.content}</div>
-    <div style="margin-top:1rem;display:flex;gap:0.5rem">
-      <button id="btn-start-quiz" class="btn-primary">Start Quiz</button>
-      <button id="btn-mark-complete" class="btn-link">${completed ? "Mark incomplete" : "Mark complete"}</button>
-      <div style="margin-left:auto" class="muted small">Module ${state.currentModuleIndex + 1} / ${c.modules.length}</div>
+// --- Auth (mocked user flow) ---
+function showAuthModal(){ $('#modal-auth').setAttribute('aria-hidden','false'); $('#auth-form').dataset.mode='login'; $('#auth-message').textContent=''; }
+function closeAuthModal(){ $('#modal-auth').setAttribute('aria-hidden','true'); $('#auth-email').value=''; $('#auth-password').value=''; }
+function handleAuthSubmit(e){ e.preventDefault(); const mode = e.currentTarget.dataset.mode||'login'; const email = $('#auth-email').value.trim().toLowerCase(); const pass = $('#auth-password').value; if(!email||!pass){ $('#auth-message').textContent='Email and password required'; return; } const store = getUserStore(); if(mode==='register'){ if(store[email]){ $('#auth-message').textContent='Account exists'; return; } store[email]={email,password:pass,name:email.split('@')[0]}; saveUserStore(store); saveUser({email,name:store[email].name}); $('#auth-message').textContent='Account created'; setTimeout(closeAuthModal,600); } else { const u = store[email]; if(!u||u.password!==pass){ $('#auth-message').textContent='Invalid credentials'; return; } saveUser({email,name:u.name}); $('#auth-message').textContent='Welcome back'; setTimeout(closeAuthModal,400); } }
+function getUserStore(){ const raw = localStorage.getItem('mindra_users')||'{}'; try{ return JSON.parse(raw);}catch{ return {}; } }
+function saveUserStore(s){ localStorage.setItem('mindra_users', JSON.stringify(s)); }
+function saveUser(u){ state.user = u; if(u) localStorage.setItem("mindra_user", JSON.stringify(u)); else localStorage.removeItem("mindra_user"); renderHeader(); }
+function loadUser(){ const raw = localStorage.getItem("mindra_user"); if(raw){ try{ state.user = JSON.parse(raw);}catch{ state.user = null;} } }
+function logout(){ saveUser(null); }
+
+// --- Admin login handling ---
+function showAdminModal(){ $('#modal-admin').setAttribute('aria-hidden','false'); $('#admin-password').value=''; $('#admin-msg').textContent=''; }
+function closeAdminModal(){ $('#modal-admin').setAttribute('aria-hidden','true'); $('#admin-password').value=''; $('#admin-msg').textContent=''; }
+function handleAdminSubmit(e){ e.preventDefault(); const pass = $('#admin-password').value; if(pass === ADMIN_PASSWORD){ setAdmin(true); $('#admin-msg').textContent = 'Signed in as admin'; setTimeout(closeAdminModal,400); } else { $('#admin-msg').textContent = 'Invalid admin password'; } }
+
+// --- Editor UI (form-based modules) ---
+function openEditorFor(courseId){ const modal = $('#modal-editor'); modal.setAttribute('aria-hidden','false'); const heading = $('#editor-heading'); if(courseId){ heading.textContent='Edit Course'; const course = state.courses.find(c=>c.id===courseId); $('#editor-form').dataset.editing = courseId; $('#editor-title').value = course.title; $('#editor-summary').value = course.summary; $('#editor-level').value = course.level||'Beginner'; renderModuleEditor(course.modules); } else { heading.textContent='Create Course'; $('#editor-form').dataset.editing=''; $('#editor-title').value=''; $('#editor-summary').value=''; $('#editor-level').value='Beginner'; renderModuleEditor([]); } }
+function closeEditor(){ $('#modal-editor').setAttribute('aria-hidden','true'); $('#editor-msg').textContent=''; }
+
+function renderModuleEditor(modules){ const root = $('#modules-editor'); root.innerHTML=''; modules.forEach((m, idx)=> addModuleItem(root, m, idx)); }
+
+function addModuleItem(root, module = {}, idx){ const id = module.id || ''; const title = module.title || '';
+  const content = module.content || '';
+  const wrapper = document.createElement('div'); wrapper.className='module-item'; wrapper.style.border='1px solid #eef6ff'; wrapper.style.padding='0.5rem'; wrapper.style.marginBottom='0.5rem'; wrapper.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
+      <strong>Module</strong>
+      <button type="button" class="btn-link btn-remove-module">Remove</button>
     </div>
-    <div style="margin-top:1rem" id="module-nav"></div>
+    <label>Title<input class="module-title" value="${escapeHTML(title)}"></label>
+    <label>Content<textarea class="module-content" rows="3">${escapeHTML(content)}</textarea></label>
+    <label>Quiz items (optional) <small class="muted">Enter question and comma-separated options; mark correct index</small></label>
+    <div class="module-quiz"></div>
+    <div style="margin-top:0.5rem;display:flex;gap:0.5rem">
+      <button type="button" class="btn-link btn-add-quiz">Add quiz</button>
+    </div>
   `;
+  root.appendChild(wrapper);
 
-  $("#btn-start-quiz").addEventListener("click", () => startQuiz(module));
-  $("#btn-mark-complete").addEventListener("click", () => toggleModuleComplete(c.id, module.id));
-
-  const nav = $("#module-nav");
-  c.modules.forEach((m, idx) => {
-    const btn = document.createElement("button");
-    btn.className = "btn-link";
-    btn.textContent = `${idx + 1}. ${m.title}`;
-    btn.addEventListener("click", () => {
-      state.currentModuleIndex = idx;
-      renderCourseView();
-    });
-    nav.appendChild(btn);
-  });
+  wrapper.querySelector('.btn-remove-module').addEventListener('click', ()=>{ wrapper.remove(); });
+  wrapper.querySelector('.btn-add-quiz').addEventListener('click', ()=> addQuizItem(wrapper, {}));
 }
 
-function toggleModuleComplete(courseId, moduleId) {
-  if (!state.user) { showAuthModal(); return; }
-  const progress = getUserProgress();
-  if (!progress[courseId]) progress[courseId] = {};
-  progress[courseId][moduleId] = !progress[courseId][moduleId];
-  setUserProgress(progress);
-  renderCourseView();
-  trackEvent("toggle_complete", { courseId, moduleId, value: progress[courseId][moduleId] });
+function addQuizItem(moduleWrapper, quiz){ const qRoot = moduleWrapper.querySelector('.module-quiz'); const question = quiz.q || ''; const options = (Array.isArray(quiz.options) ? quiz.options.join('|') : ''); const answerIndex = (typeof quiz.answerIndex === 'number') ? quiz.answerIndex : 0; const item = document.createElement('div'); item.style.borderTop='1px solid #f0f6ff'; item.style.paddingTop='0.5rem'; item.style.marginTop='0.5rem'; item.innerHTML = `
+  <label>Question<input class="quiz-q" value="${escapeHTML(question)}"></label>
+  <label>Options (separate with |)<input class="quiz-options" value="${escapeHTML(options)}"></label>
+  <label>Correct option index<input type="number" class="quiz-answer" value="${answerIndex}" min="0"></label>
+  <div style="margin-top:0.25rem"><button type="button" class="btn-link btn-remove-quiz">Remove quiz</button></div>
+`;
+  qRoot.appendChild(item);
+  item.querySelector('.btn-remove-quiz').addEventListener('click', ()=> item.remove());
 }
 
-function startQuiz(module) {
-  // render simple quiz modal
-  openQuizModal(module);
-  trackEvent("start_quiz", { moduleId: module.id });
+function collectModulesFromEditor(){ const items = $$('#modules-editor .module-item'); const modules = []; items.forEach((it, idx)=>{ const title = it.querySelector('.module-title').value.trim() || `Module ${idx+1}`; const content = it.querySelector('.module-content').value.trim() || '<p>Content coming soon.</p>'; const quizEls = Array.from(it.querySelectorAll('.module-quiz > div')); const quizzes = quizEls.map(qel => { const q = qel.querySelector('.quiz-q').value.trim(); const opts = qel.querySelector('.quiz-options').value.split('|').map(s=>s.trim()).filter(Boolean); const ans = Number(qel.querySelector('.quiz-answer').value) || 0; return { q, options: opts, answerIndex: ans }; }).filter(q=>q.q); const id = it.dataset.id || `${slugify(title)}-mod-${idx+1}`; modules.push({ id, title, content, quiz: quizzes }); }); return modules; }
+
+function handleEditorSubmit(e){ e.preventDefault(); if(!state.isAdmin){ $('#editor-msg').textContent = 'Only admins can save courses.'; return; } const editing = e.currentTarget.dataset.editing; const title = $('#editor-title').value.trim(); if(!title){ $('#editor-msg').textContent = 'Title required'; return; } const summary = $('#editor-summary').value.trim(); const level = $('#editor-level').value; const modules = collectModulesFromEditor(); if(editing){ const i = state.courses.findIndex(c=>c.id===editing); if(i>=0){ state.courses[i].title = title; state.courses[i].summary = summary; state.courses[i].level = level; state.courses[i].modules = modules; $('#editor-msg').textContent = 'Updated course'; saveCourses(); } } else { let id = slugify(title); let suffix=1; while(state.courses.find(c=>c.id===id)){ id = `${slugify(title)}-${suffix++}`; } state.courses.push({ id, title, summary, level, modules }); $('#editor-msg').textContent = 'Created course'; saveCourses(); } renderCoursesGrid('courses-list'); renderCoursesGrid('courses-grid'); setTimeout(closeEditor, 500); }
+
+// --- Header & wiring ---
+function renderHeader(){ const loginBtn = $('#btn-login'); if(state.user){ loginBtn.textContent = `Hi, ${state.user.name}`; loginBtn.onclick = ()=> logout(); } else { loginBtn.textContent = 'Log in'; loginBtn.onclick = ()=> showAuthModal(); } renderAdminUI(); }
+
+function wireUi(){ $('#nav-home').addEventListener('click', ()=> navigateTo('home'));
+  $('#nav-courses').addEventListener('click', ()=> navigateTo('courses'));
+  $('#nav-progress').addEventListener('click', ()=> { navigateTo('progress'); });
+  $('#start-now').addEventListener('click', ()=> navigateTo('courses'));
+  $('#btn-login').addEventListener('click', ()=> showAuthModal());
+  $('#close-auth').addEventListener('click', ()=> closeAuthModal());
+  $('#admin-form').addEventListener('submit', handleAdminSubmit);
+  $('#close-admin').addEventListener('click', ()=> closeAdminModal());
+  $('#btn-admin').addEventListener('click', ()=> { if(state.isAdmin) openEditorFor(); else showAdminModal(); });
+  $('#btn-new-course').addEventListener('click', ()=> openEditorFor());
+  $('#close-editor').addEventListener('click', ()=> closeEditor());
+  $('#btn-add-module').addEventListener('click', ()=> addModuleItem($('#modules-editor')));
+  $('#editor-form').addEventListener('submit', handleEditorSubmit);
+  $('#auth-form').addEventListener('submit', handleAuthSubmit);
 }
 
-function openQuizModal(module) {
-  const modal = $("#modal-quiz");
-  const root = $("#quiz-root");
-  modal.setAttribute("aria-hidden", "false");
-  let qIndex = 0;
-  let score = 0;
-
-  function renderQuestion() {
-    const q = module.quiz[qIndex];
-    if (!q) return finish();
-    root.innerHTML = `
-      <h3>Quiz: ${escapeHTML(module.title)}</h3>
-      <div class="muted small">Question ${qIndex+1} / ${module.quiz.length}</div>
-      <hr>
-      <p><strong>${escapeHTML(q.q)}</strong></p>
-      <div id="quiz-options"></div>
-      <div style="margin-top:1rem">
-        <button id="quiz-next" class="btn-primary">Next</button>
-      </div>
-      <div id="quiz-feedback" class="muted small" style="margin-top:0.5rem"></div>
-    `;
-    const optRoot = $("#quiz-options");
-    q.options.forEach((o, idx) => {
-      const oEl = document.createElement("button");
-      oEl.className = "btn-link";
-      oEl.style.display = "block";
-      oEl.style.textAlign = "left";
-      oEl.textContent = o;
-      oEl.dataset.idx = idx;
-      oEl.addEventListener("click", () => {
-        const chosen = Number(oEl.dataset.idx);
-        const correct = q.answerIndex;
-        const fb = $("#quiz-feedback");
-        if (chosen === correct) {
-          fb.textContent = "Correct ✅";
-          score++;
-          trackEvent("quiz_answer", { moduleId: module.id, qIndex, correct: true });
-        } else {
-          fb.textContent = `Wrong — correct answer: ${escapeHTML(q.options[correct])}`;
-          trackEvent("quiz_answer", { moduleId: module.id, qIndex, correct: false });
-        }
-      });
-      optRoot.appendChild(oEl);
-    });
-
-    $("#quiz-next").addEventListener("click", () => {
-      qIndex++;
-      if (qIndex >= module.quiz.length) finish();
-      else renderQuestion();
-    });
-  }
-
-  function finish() {
-    root.innerHTML = `
-      <h3>Quiz complete</h3>
-      <p class="muted">Score: ${score} / ${module.quiz.length}</p>
-      <div style="display:flex;gap:0.5rem">
-        <button id="quiz-close" class="btn-primary">Close</button>
-      </div>
-    `;
-    $("#quiz-close").addEventListener("click", closeQuizModal);
-
-    // record simple progress if score qualifies (e.g., >0)
-    if (state.user) {
-      const course = state.currentCourse;
-      if (course) {
-        const progress = getUserProgress();
-        if (!progress[course.id]) progress[course.id] = {};
-        if (score > 0) progress[course.id][module.id] = true;
-        setUserProgress(progress);
-      }
-    }
-    trackEvent("finish_quiz", { moduleId: module.id, score });
-  }
-
-  function closeQuizModal() {
-    modal.setAttribute("aria-hidden", "true");
-    $("#quiz-root").innerHTML = "";
-    renderCourseView();
-  }
-
-  $("#close-quiz").onclick = closeQuizModal;
-  renderQuestion();
-}
-
-// --- Simple navigation ---
-function navigateTo(pageId) {
-  $$(".page").forEach(p => p.classList.remove("page-active"));
-  $("#home").classList.remove("page-active");
-  const p = $(`#${pageId}`);
-  if (p) p.classList.add("page-active");
-  // manage aria-hidden
-  $$(".page").forEach(el => el.setAttribute("aria-hidden", el !== p));
-}
-
-// --- Auth modal & handlers (mocked) ---
-function showAuthModal() {
-  $("#modal-auth").setAttribute("aria-hidden", "false");
-  $("#auth-title").textContent = "Log in";
-  $("#switch-auth").textContent = "Create account";
-  $("#auth-form").dataset.mode = "login";
-  $("#auth-message").textContent = "";
-}
-function showRegisterModal() {
-  $("#modal-auth").setAttribute("aria-hidden", "false");
-  $("#auth-title").textContent = "Create account";
-  $("#switch-auth").textContent = "Have an account? Log in";
-  $("#auth-form").dataset.mode = "register";
-  $("#auth-message").textContent = "";
-}
-
-function closeAuthModal() {
-  $("#modal-auth").setAttribute("aria-hidden", "true");
-  $("#auth-email").value = "";
-  $("#auth-password").value = "";
-  $("#auth-message").textContent = "";
-}
-
-// Very small mock "user DB" inside localStorage — DO NOT USE IN PRODUCTION
-function getUserStore() {
-  const raw = localStorage.getItem("mindra_users") || "{}";
-  try { return JSON.parse(raw); } catch { return {}; }
-}
-function saveUserStore(s) { localStorage.setItem("mindra_users", JSON.stringify(s)); }
-
-function handleAuthSubmit(e) {
-  e.preventDefault();
-  const mode = e.currentTarget.dataset.mode || "login";
-  const email = $("#auth-email").value.trim().toLowerCase();
-  const pass = $("#auth-password").value;
-  if (!email || !pass) { $("#auth-message").textContent = "Email and password required"; return; }
-
-  const store = getUserStore();
-  if (mode === "register") {
-    if (store[email]) { $("#auth-message").textContent = "Account exists — try logging in"; return; }
-    store[email] = { email, password: pass, name: email.split("@")[0] };
-    saveUserStore(store);
-    saveUser({ email, name: store[email].name });
-    $("#auth-message").textContent = "Account created — you are now logged in";
-    trackEvent("register", { email });
-    setTimeout(closeAuthModal, 700);
-  } else {
-    const u = store[email];
-    if (!u || u.password !== pass) { $("#auth-message").textContent = "Invalid credentials"; return; }
-    saveUser({ email, name: u.name });
-    $("#auth-message").textContent = "Welcome back";
-    trackEvent("login", { email });
-    setTimeout(closeAuthModal, 500);
-  }
-}
-
-function logout() {
-  trackEvent("logout", { email: state.user?.email });
-  saveUser(null);
-  renderHeader();
-}
-
-// --- Progress page rendering ---
-function renderProgressPage() {
-  const root = $("#progress-list");
-  if (!state.user) {
-    root.innerHTML = `<p class="muted">Sign in to track your progress.</p>`;
-    return;
-  }
-  const progress = getUserProgress();
-  root.innerHTML = "";
-  state.courses.forEach(c => {
-    const cNode = document.createElement("div");
-    const modules = c.modules.map(m => ({ id: m.id, title: m.title, done: progress[c.id] && progress[c.id][m.id] }));
-    const doneCount = modules.filter(m=>m.done).length;
-    cNode.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem">
-        <div><strong>${escapeHTML(c.title)}</strong> <div class="muted small">${c.summary}</div></div>
-        <div class="muted small">${doneCount}/${modules.length} done</div>
-      </div>
-    `;
-    root.appendChild(cNode);
-  });
-}
-
-// --- Editor (admin prototyping) ---
-function openEditorFor(courseId) {
-  // simple open: find course and populate editor
-  const modal = $("#modal-editor");
-  modal.setAttribute("aria-hidden", "false");
-  const course = state.courses.find(c => c.id === courseId);
-  if (course) {
-    $("#editor-title").value = course.title;
-    $("#editor-summary").value = course.summary;
-    $("#editor-level").value = course.level || "Beginner";
-    $("#editor-modules").value = JSON.stringify(course.modules, null, 2);
-    $("#editor-form").dataset.editing = courseId;
-  } else {
-    $("#editor-title").value = "";
-    $("#editor-summary").value = "";
-    $("#editor-level").value = "Beginner";
-    $("#editor-modules").value = "";
-    $("#editor-form").dataset.editing = "";
-  }
-}
-
-function closeEditor() {
-  $("#modal-editor").setAttribute("aria-hidden", "true");
-  $("#editor-msg").textContent = "";
-}
-
-function handleEditorSubmit(e) {
-  e.preventDefault();
-  const editing = e.currentTarget.dataset.editing;
-  const title = $("#editor-title").value.trim();
-  const summary = $("#editor-summary").value.trim();
-  const level = $("#editor-level").value;
-  const modulesText = $("#editor-modules").value.trim();
-  if (!title) { $("#editor-msg").textContent = "Title required"; return; }
-  let modules;
-  try { modules = modulesText ? JSON.parse(modulesText) : []; } catch (err) {
-    $("#editor-msg").textContent = "Modules must be valid JSON";
-    return;
-  }
-  if (editing) {
-    // update
-    const i = state.courses.findIndex(c=>c.id===editing);
-    if (i >= 0) {
-      state.courses[i].title = title;
-      state.courses[i].summary = summary;
-      state.courses[i].level = level;
-      state.courses[i].modules = modules;
-      $("#editor-msg").textContent = "Updated course";
-      trackEvent("edit_course", { courseId: editing });
-    }
-  } else {
-    // create id
-    const id = title.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-    state.courses.push({ id, title, summary, level, modules });
-    $("#editor-msg").textContent = "Created course";
-    trackEvent("create_course", { courseId: id });
-  }
-  renderCoursesGrid("courses-list");
-  renderCoursesGrid("courses-grid");
-  setTimeout(closeEditor, 700);
-}
-
-// --- Header & top-level events ---
-function renderHeader() {
-  const loginBtn = $("#btn-login");
-  if (state.user) {
-    loginBtn.textContent = `Hi, ${state.user.name}`;
-    loginBtn.onclick = () => logout();
-    $("#btn-admin").style.display = "inline-block";
-  } else {
-    loginBtn.textContent = "Log in";
-    loginBtn.onclick = () => showAuthModal();
-    $("#btn-admin").style.display = "inline-block";
-  }
-}
-
-// Simple client-side event tracking (replace with real analytics backend)
-function trackEvent(name, payload = {}) {
-  const ev = { name, payload, ts: Date.now(), user: state.user?.email || null };
-  // For now we console.log and store a small history in localStorage
-  console.log("MINDRA_EVENT", ev);
-  const raw = localStorage.getItem("mindra_telemetry") || "[]";
-  try {
-    const arr = JSON.parse(raw);
-    arr.push(ev);
-    localStorage.setItem("mindra_telemetry", JSON.stringify(arr.slice(-500))); // keep last 500
-  } catch (e) {
-    localStorage.setItem("mindra_telemetry", JSON.stringify([ev]));
-  }
-}
-
-// --- Wiring & event listeners ---
-function wireUi() {
-  // nav
-  $("#nav-home").addEventListener("click", () => navigateTo("home"));
-  $("#nav-courses").addEventListener("click", () => navigateTo("courses"));
-  $("#nav-progress").addEventListener("click", () => { navigateTo("progress"); renderProgressPage(); });
-
-  $("#start-now").addEventListener("click", () => navigateTo("courses"));
-  $("#btn-login").addEventListener("click", () => showAuthModal());
-  $("#close-auth").addEventListener("click", () => closeAuthModal());
-  $("#close-quiz").addEventListener("click", () => $("#modal-quiz").setAttribute("aria-hidden", "true"));
-  $("#close-editor").addEventListener("click", () => closeEditor());
-  $("#back-to-courses").addEventListener("click", () => navigateTo("courses"));
-
-  // auth form
-  $("#auth-form").addEventListener("submit", handleAuthSubmit);
-  $("#switch-auth").addEventListener("click", (e) => {
-    const mode = $("#auth-form").dataset.mode || "login";
-    if (mode === "login") showRegisterModal(); else showAuthModal();
-  });
-
-  // editor form
-  $("#editor-form").addEventListener("submit", handleEditorSubmit);
-
-  // admin open
-  $("#btn-admin").addEventListener("click", () => {
-    // simple gate: show editor but require sign in for persistence
-    openEditorFor();
-  });
-
-  // initial render of course grids
-  renderCoursesGrid("courses-list");
-  renderCoursesGrid("courses-grid");
-
-  // Render header based on auth state
-  renderHeader();
-}
-
-// --- Init ---
-function init() {
-  loadUser();
-  wireUi();
-  // expose state for debugging
-  window.Mindra = state;
-  trackEvent("app_init", {});
-}
-
+function init(){ loadUser(); loadAdmin(); loadCourses(); wireUi(); renderCoursesGrid('courses-list'); renderCoursesGrid('courses-grid'); renderHeader(); }
 init();
